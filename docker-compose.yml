@@ -1,0 +1,68 @@
+version: "3"
+
+services:
+  postgres:
+    container_name: icarus-postgres
+    restart: always
+    image: postgres:9.6.5
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=MSDjsejwemw4sd
+      - POSTGRES_USER=icarus
+      - POSTGRES_DB=icarus-blockchain-importer
+    networks:
+      - icarus-net
+  postgres-setup:
+    container_name: icarus-postgres-setup
+    restart: "no"
+    build:
+      context: .
+      dockerfile: ./Dockerfile-postgres
+    command:
+      - "./wait-for-it.sh"
+      - "--host=postgres"
+      - "--port=5432"
+      - "--"
+      - "psql"
+      - "--host=postgres"
+      - "--port=5432"
+      - "--username=icarus"
+      - "--dbname=icarus-blockchain-importer"
+      - "--file=./schema.sql"
+    environment:
+      - PGPASSWORD=MSDjsejwemw4sd
+    networks:
+      - icarus-net
+  icarus-blockchain-importer:
+    image: icarus-blockchain-importer:latest
+    command:
+      - "/opt/project-icarus-importer/importer-bin"
+      - ""
+      - "--runtime-args"
+      # `cardano-start` takes the arguments to the blockchain
+      # imorter process as one string
+      - >-
+        --postgres-name icarus-blockchain-importer
+        --postgres-user icarus
+        --postgres-password MSDjsejwemw4sd
+        --postgres-host icarus-postgres
+        --postgres-port 5432
+      - "--no-tls"
+    depends_on: 
+      - postgres-setup
+      - postgres
+    environment:
+      - IMPORTER_SQL_DB=icarus-blockchain-importer
+      - IMPORTER_SQL_USER=icarus
+      - IMPORTER_SQL_HOST=postgres
+      - IMPORTER_SQL_PORT=5432
+      - IMPORTER_SQL_PASSWORD=MSDjsejwemw4sd
+      - POSTGRES_PASSWORD=MSDjsejwemw4sd
+    ports:
+      - "8200:8200"
+    networks:
+      - icarus-net
+networks:
+  icarus-net:
+    driver: bridge
